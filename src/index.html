@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    >
+
+    <!-- CONTENT SECURITY POLICY -->
+    <meta
+        http-equiv="Content-Security-Policy"
+        content="
+            default-src 'self';
+            script-src 'self' 'unsafe-inline';
+            style-src 'self' 'unsafe-inline';
+            img-src 'self' https: data: blob:;
+            media-src 'self' https: data: blob:;
+            connect-src 'self' https:;
+            font-src 'self' https: data:;
+            object-src 'none';
+            base-uri 'self';
+            form-action 'self';
+            frame-src 'none';
+        "
+    >
+
+    <meta
+        name="referrer"
+        content="strict-origin-when-cross-origin"
+    >
+
+    <title>NyanPict - Kolektor Gambar</title>
+
+    <!-- MAIN CSS -->
+    <link
+        rel="stylesheet"
+        href="./css/style.css"
+    >
+
+</head>
+
+<body>
+
+    <!-- ================================== -->
+    <!-- CUSTOM TITLE BAR                   -->
+    <!-- ================================== -->
+
+    <div class="custom-titlebar">
+
+        <div class="titlebar-drag-region">
+            NyanPict SPA
+        </div>
+
+        <div class="titlebar-controls">
+
+            <button
+                class="window-btn minimize-btn"
+                type="button"
+                aria-label="Minimize"
+                onclick="window.electronAPI?.minimize()"
+            >
+                _
+            </button>
+
+            <button
+                class="window-btn maximize-btn"
+                type="button"
+                aria-label="Maximize"
+                onclick="window.electronAPI?.maximize()"
+            >
+                □
+            </button>
+
+            <button
+                class="window-btn close-btn"
+                type="button"
+                aria-label="Close"
+                onclick="window.electronAPI?.close()"
+            >
+                ✕
+            </button>
+
+        </div>
+
+    </div>
+
+
+    <!-- ================================== -->
+    <!-- HEADER                             -->
+    <!-- ================================== -->
+
+    <header class="header">
+
+        <h1>🐱 NyanPict</h1>
+
+        <p>
+            Aplikasi Pengumpul Gambar &amp; Video Booru
+            (Frontend-Only)
+        </p>
+
+
+        <!-- NAVIGATION -->
+
+        <nav
+            aria-label="Navigasi utama"
+            style="
+                display:flex;
+                justify-content:center;
+                gap:10px;
+                margin-bottom:15px;
+                flex-wrap:wrap;
+            "
+        >
+
+            <a
+                href="./bookmarks.html"
+                style="
+                    padding:8px 16px;
+                    background:#ffb900;
+                    color:#111;
+                    border-radius:20px;
+                    text-decoration:none;
+                    font-weight:bold;
+                    font-size:13px;
+                "
+            >
+                ⭐ Favorit (Bookmark)
+            </a>
+
+            <a
+                href="./settings.html"
+                style="
+                    padding:8px 16px;
+                    background:#333;
+                    color:#fff;
+                    border-radius:20px;
+                    text-decoration:none;
+                    font-weight:bold;
+                    font-size:13px;
+                "
+            >
+                ⚙️ Pengaturan
+            </a>
+
+        </nav>
+
+
+        <!-- SEARCH CONTAINER -->
+
+        <div
+            class="search-container"
+            style="
+                display:flex;
+                flex-direction:column;
+                align-items:center;
+            "
+        >
+
+            <div
+                style="
+                    display:flex;
+                    gap:12px;
+                    width:100%;
+                    max-width:600px;
+                    justify-content:center;
+                    position:relative;
+                "
+            >
+
+                <!-- SOURCE SELECT -->
+
+                <select
+                    id="source-select"
+                    aria-label="Pilih sumber gambar"
+                >
+
+                    <option value="all">
+                        🌐 Semua Sumber
+                    </option>
+
+                    <option value="gelbooru">
+                        Gelbooru
+                    </option>
+
+                    <option value="rule34">
+                        Rule34
+                    </option>
+
+                    <option value="danbooru">
+                        Danbooru
+                    </option>
+
+                </select>
+
+
+                <!-- TAG INPUT -->
+
+                <div
+                    style="
+                        position:relative;
+                        flex:1;
+                    "
+                >
+
+                    <input
+                        type="text"
+                        id="tag-input"
+                        placeholder="Cari tag (cth: scenery, 1girl)..."
+                        autocomplete="off"
+                        aria-label="Tag pencarian"
+                        style="
+                            width:100%;
+                            box-sizing:border-box;
+                        "
+                    >
+
+                    <!-- AUTOCOMPLETE -->
+
+                    <div
+                        id="autocomplete-list"
+                        class="autocomplete-dropdown"
+                        style="
+                            display:none;
+                            position:absolute;
+                            z-index:999;
+                            background:#333;
+                            width:100%;
+                            max-height:200px;
+                            overflow-y:auto;
+                            border-radius:4px;
+                            box-shadow:0 4px 6px rgba(0,0,0,0.5);
+                        "
+                    ></div>
+
+                </div>
+
+
+                <!-- SEARCH BUTTON -->
+
+                <button
+                    type="button"
+                    onclick="applySearch()"
+                >
+                    Cari
+                </button>
+
+            </div>
+
+
+            <!-- SEARCH TIPS -->
+
+            <div
+                style="
+                    font-size:11px;
+                    color:var(--text-secondary,#aaa);
+                    margin-top:6px;
+                "
+            >
+                💡
+                <em>
+                    Tips: Gunakan tanda minus (-) untuk
+                    mengabaikan tag (cth: landscape -blurry)
+                </em>
+            </div>
+
+        </div>
+
+    </header>
+
+
+    <!-- ================================== -->
+    <!-- IMAGE GALLERY                      -->
+    <!-- ================================== -->
+
+    <main>
+
+        <div
+            id="masonry-gallery"
+            class="masonry-grid"
+            aria-live="polite"
+        ></div>
+
+        <!-- INFINITE SCROLL SENTINEL -->
+
+        <div
+            id="scroll-sentinel"
+            style="
+                height:20px;
+                width:100%;
+                margin-top:20px;
+            "
+        ></div>
+
+    </main>
+
+
+    <!-- ================================== -->
+    <!-- LIGHTBOX                           -->
+    <!-- ================================== -->
+
+    <div
+        id="lightbox-modal"
+        class="lightbox-overlay"
+        role="dialog"
+        aria-modal="true"
+    >
+
+        <button
+            class="lightbox-close"
+            type="button"
+            aria-label="Tutup gambar"
+            onclick="closeLightbox()"
+        >
+            ✕
+        </button>
+
+
+        <div class="lightbox-content-wrapper">
+
+            <!-- IMAGE -->
+
+            <img
+                id="lightbox-img"
+                src=""
+                alt="Zoomed Image"
+                style="display:none;"
+            >
+
+
+            <!-- VIDEO -->
+
+            <video
+                id="lightbox-video"
+                controls
+                autoplay
+                loop
+                playsinline
+                style="
+                    display:none;
+                    max-width:100%;
+                    max-height:75vh;
+                    border-radius:8px;
+                    background:#000;
+                "
+            ></video>
+
+
+            <!-- IMAGE INFORMATION -->
+
+            <div
+                id="lightbox-info"
+                class="lightbox-caption"
+            ></div>
+
+        </div>
+
+    </div>
+
+
+    <!-- ================================== -->
+    <!-- TOAST NOTIFICATION                 -->
+    <!-- ================================== -->
+
+    <div
+        id="toast-container"
+        role="status"
+        aria-live="polite"
+        style="
+            position:fixed;
+            bottom:20px;
+            left:50%;
+            transform:translateX(-50%);
+            z-index:1000;
+            display:flex;
+            flex-direction:column;
+            gap:10px;
+        "
+    ></div>
+
+
+    <!-- ================================== -->
+    <!-- MAIN JAVASCRIPT                    -->
+    <!-- ================================== -->
+
+    <script
+        src="./js/main.js"
+        defer
+    ></script>
+
+</body>
+</html>

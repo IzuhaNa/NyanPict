@@ -1,0 +1,14 @@
+{
+  "appId": "com.nyanpict.app",
+  "appName": "NyanPict",
+  "webDir": "src",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    }
+  }
+}

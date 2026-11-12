@@ -1,0 +1,49 @@
+
+{
+  "name": "nyanpict",
+  "version": "1.0.0",
+  "description": "NyanPict - Booru Image Gallery",
+  "main": "electron-main.js",
+  "scripts": {
+    "start": "electron .",
+    "build:win": "electron-builder --win",
+    "build:linux": "electron-builder --linux",
+    "sync:android": "npx cap sync android",
+    "open:android": "npx cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "5.7.8",
+    "@capacitor/core": "5.7.8"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "5.7.8",
+    "electron": "^45.3.0",
+    "electron-builder": "26.18.0"
+  },
+  "build": {
+    "appId": "com.nyanpict.app",
+    "productName": "NyanPict",
+    "directories": {
+      "output": "dist-desktop",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "electron-main.js",
+      "preload.js",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "build/icon.ico"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "icon": "build/icon.png"
+    }
+  }
+}

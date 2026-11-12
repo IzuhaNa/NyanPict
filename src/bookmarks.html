@@ -1,0 +1,802 @@
+
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    >
+
+    <meta
+        http-equiv="Content-Security-Policy"
+        content="
+            default-src 'self';
+            script-src 'self' 'unsafe-inline';
+            style-src 'self' 'unsafe-inline';
+            img-src 'self' https: data: blob:;
+            media-src 'self' https: data: blob:;
+            connect-src 'self' https:;
+            font-src 'self' https: data:;
+            object-src 'none';
+            base-uri 'self';
+            form-action 'self';
+            frame-src 'none';
+        "
+    >
+
+    <title>Favorit - NyanPict</title>
+    <link rel="stylesheet" href="./css/style.css">
+
+    <style>
+        .bookmark-header-actions {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .bookmark-header-actions button {
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-weight: bold;
+        }
+
+        .bookmark-back-btn {
+            background: #333;
+            color: #fff;
+        }
+
+        .bookmark-clear-btn,
+        .bookmark-remove-btn {
+            background: #e63946;
+            color: #fff;
+        }
+
+        .bookmark-card {
+            break-inside: avoid;
+        }
+
+        .bookmark-media {
+            width: 100%;
+            display: block;
+            cursor: pointer;
+            background: #222;
+            object-fit: cover;
+        }
+
+        .bookmark-media.loaded {
+            filter: none;
+            opacity: 1;
+        }
+
+        .bookmark-media-error {
+            min-height: 150px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            gap: 10px;
+            padding: 15px;
+            color: #aaa;
+            text-align: center;
+            font-size: 12px;
+        }
+
+        .bookmark-actions {
+            display: flex;
+            gap: 5px;
+            padding: 0 12px 12px;
+        }
+
+        .bookmark-actions button {
+            flex: 1;
+            padding: 8px;
+            font-size: 12px;
+        }
+
+        .bookmark-empty {
+            text-align: center;
+            width: 100%;
+            color: #aaa;
+            margin-top: 50px;
+        }
+
+        .bookmark-overview {
+            position: fixed;
+            inset: 0;
+            z-index: 99998;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background: rgba(0, 0, 0, .92);
+        }
+
+        .bookmark-overview.active {
+            display: flex;
+        }
+
+        .bookmark-overview-content {
+            max-width: 95vw;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .bookmark-overview img,
+        .bookmark-overview video {
+            max-width: 90vw;
+            max-height: 75vh;
+            object-fit: contain;
+            border-radius: 8px;
+            background: #000;
+        }
+
+        .bookmark-overview-info {
+            color: #fff;
+            text-align: center;
+            font-size: 13px;
+        }
+
+        .bookmark-overview-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+        }
+
+        .bookmark-overview-actions button {
+            padding: 9px 15px;
+        }
+
+        .bookmark-overview-close {
+            background: #e63946;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="custom-titlebar">
+        <div class="titlebar-drag-region">
+            NyanPict SPA - Favorit
+        </div>
+
+        <div class="titlebar-controls">
+            <button
+                class="window-btn minimize-btn"
+                type="button"
+                onclick="window.electronAPI?.minimize()"
+            >_</button>
+
+            <button
+                class="window-btn maximize-btn"
+                type="button"
+                onclick="window.electronAPI?.maximize()"
+            >□</button>
+
+            <button
+                class="window-btn close-btn"
+                type="button"
+                onclick="window.electronAPI?.close()"
+            >✕</button>
+        </div>
+    </div>
+
+    <header class="header">
+        <h1>⭐ Favorit (Bookmark)</h1>
+
+        <div class="bookmark-header-actions">
+            <button
+                type="button"
+                class="bookmark-back-btn"
+                onclick="window.location.href='./index.html'"
+            >
+                ⬅ Kembali ke Beranda
+            </button>
+
+            <button
+                type="button"
+                class="bookmark-clear-btn"
+                onclick="clearAllBookmarks()"
+            >
+                🗑️ Hapus Semua
+            </button>
+        </div>
+    </header>
+
+    <main>
+        <div
+            id="bookmarks-gallery"
+            class="masonry-grid"
+            style="padding:20px;"
+        ></div>
+    </main>
+
+    <div
+        id="bookmark-overview"
+        class="bookmark-overview"
+        role="dialog"
+        aria-modal="true"
+    >
+        <div class="bookmark-overview-content">
+
+            <img
+                id="bookmark-overview-image"
+                alt="Bookmark"
+                style="display:none;"
+            >
+
+            <video
+                id="bookmark-overview-video"
+                controls
+                playsinline
+                style="display:none;"
+            ></video>
+
+            <div
+                id="bookmark-overview-info"
+                class="bookmark-overview-info"
+            ></div>
+
+            <div class="bookmark-overview-actions">
+                <button
+                    id="bookmark-overview-download"
+                    type="button"
+                >
+                    ⬇ Unduh
+                </button>
+
+                <button
+                    type="button"
+                    class="bookmark-overview-close"
+                    onclick="closeBookmarkOverview()"
+                >
+                    Tutup
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <div
+        id="toast-container"
+        style="
+            position:fixed;
+            bottom:20px;
+            left:50%;
+            transform:translateX(-50%);
+            z-index:100000;
+            display:flex;
+            flex-direction:column;
+            gap:10px;
+        "
+    ></div>
+
+    <script>
+        'use strict';
+
+        let currentBookmarkOverview = null;
+
+        function getBookmarks() {
+            try {
+                const data = JSON.parse(
+                    localStorage.getItem('nyanpict_bookmarks') || '[]'
+                );
+
+                return Array.isArray(data) ? data : [];
+            } catch (error) {
+                console.error(
+                    '[NyanPict] Bookmark tidak valid:',
+                    error
+                );
+
+                return [];
+            }
+        }
+
+        function saveBookmarks(bookmarks) {
+            try {
+                localStorage.setItem(
+                    'nyanpict_bookmarks',
+                    JSON.stringify(bookmarks)
+                );
+
+                return true;
+            } catch (error) {
+                console.error(error);
+                return false;
+            }
+        }
+
+        function normalizeUrl(value) {
+            if (typeof value !== 'string' || !value.trim()) {
+                return '';
+            }
+
+            try {
+                const url = new URL(value.trim());
+
+                if (
+                    url.protocol !== 'https:' &&
+                    url.protocol !== 'http:'
+                ) {
+                    return '';
+                }
+
+                return url.href;
+            } catch {
+                return '';
+            }
+        }
+
+        function isVideo(url) {
+            if (!url) return false;
+
+            try {
+                const pathname = new URL(url).pathname.toLowerCase();
+
+                return /\.(mp4|webm|mov|m4v|ogv)$/.test(pathname);
+            } catch {
+                return false;
+            }
+        }
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById(
+                'toast-container'
+            );
+
+            const toast = document.createElement('div');
+
+            toast.textContent = String(message);
+
+            toast.style.cssText = [
+                'padding:10px 20px',
+                'border-radius:5px',
+                'color:#fff',
+                `background:${type === 'error' ? '#e63946' : '#2a9d8f'}`,
+                'box-shadow:0 3px 12px rgba(0,0,0,.3)',
+                'font-size:13px',
+                'max-width:min(90vw,520px)'
+            ].join(';');
+
+            container.appendChild(toast);
+
+            window.setTimeout(() => toast.remove(), 4000);
+        }
+
+        async function triggerUniversalDownload(
+            button,
+            fileUrl,
+            platform,
+            id
+        ) {
+            const url = normalizeUrl(fileUrl);
+
+            if (!url) {
+                showToast('URL media tidak valid.', 'error');
+                return;
+            }
+
+            if (
+                !window.electronAPI ||
+                typeof window.electronAPI.downloadMedia !== 'function'
+            ) {
+                showToast(
+                    'Fitur download Electron tidak tersedia.',
+                    'error'
+                );
+                return;
+            }
+
+            const originalText = button.textContent;
+
+            button.disabled = true;
+            button.textContent = '⏳ Mengunduh...';
+
+            try {
+                const result = await window.electronAPI.downloadMedia(
+                    url,
+                    String(platform || '').toLowerCase(),
+                    String(id || 'unknown')
+                );
+
+                if (result && result.canceled) {
+                    showToast('Download dibatalkan.');
+                    return;
+                }
+
+                if (!result || !result.success) {
+                    throw new Error(
+                        result?.error || 'Download gagal.'
+                    );
+                }
+
+                const sizeMB = (
+                    Number(result.size || 0) / (1024 * 1024)
+                ).toFixed(2);
+
+                showToast(
+                    `Berhasil disimpan: ${result.fileName} (${sizeMB} MB)`
+                );
+
+            } catch (error) {
+                console.error(
+                    '[NyanPict] Bookmark download error:',
+                    error
+                );
+
+                showToast(
+                    error.message || 'Gagal mengunduh media.',
+                    'error'
+                );
+
+            } finally {
+                button.disabled = false;
+                button.textContent = originalText;
+            }
+        }
+
+        function createBookmarkCard(item, index) {
+            const card = document.createElement('div');
+
+            card.className = 'masonry-item bookmark-card';
+
+            const previewUrl =
+                normalizeUrl(item.preview_url) ||
+                normalizeUrl(item.download_url);
+
+            const downloadUrl =
+                normalizeUrl(item.download_url) ||
+                previewUrl;
+
+            const mediaUrl = previewUrl || downloadUrl;
+
+            const video = isVideo(mediaUrl);
+
+            const media = document.createElement(
+                video ? 'video' : 'img'
+            );
+
+            media.className = 'bookmark-media';
+
+            media.style.cssText = [
+                'width:100%',
+                'display:block',
+                'cursor:pointer',
+                'background:#222',
+                'object-fit:cover'
+            ].join(';');
+
+            if (video) {
+                media.muted = true;
+                media.loop = true;
+                media.autoplay = true;
+                media.playsInline = true;
+                media.preload = 'metadata';
+            } else {
+                media.alt =
+                    `NyanPict ${item.platform} ID ${item.id}`;
+
+                media.loading = 'lazy';
+                media.decoding = 'async';
+            }
+
+            media.src = mediaUrl;
+
+            media.addEventListener('loadeddata', () => {
+                media.classList.add('loaded');
+            }, { once: true });
+
+            media.addEventListener('load', () => {
+                media.classList.add('loaded');
+            }, { once: true });
+
+            media.addEventListener('error', () => {
+                const errorBox = document.createElement('div');
+
+                errorBox.className = 'bookmark-media-error';
+
+                const label = document.createElement('span');
+                label.textContent = 'Gambar tidak dapat dimuat';
+
+                const openButton = document.createElement('button');
+                openButton.type = 'button';
+                openButton.textContent = 'Coba buka file asli';
+
+                openButton.addEventListener('click', () => {
+                    if (downloadUrl) {
+                        openBookmarkOverview(
+                            downloadUrl,
+                            item
+                        );
+                    }
+                });
+
+                errorBox.append(label);
+
+                if (downloadUrl) {
+                    errorBox.append(openButton);
+                }
+
+                media.replaceWith(errorBox);
+            }, { once: true });
+
+            media.addEventListener('click', () => {
+                openBookmarkOverview(
+                    downloadUrl || mediaUrl,
+                    item
+                );
+            });
+
+            card.appendChild(media);
+
+            const info = document.createElement('div');
+
+            info.className = 'item-info';
+            info.style.cssText =
+                'padding:10px;font-size:12px;color:#fff;';
+
+            const strong = document.createElement('strong');
+
+            strong.textContent = 'ID: ';
+
+            info.append(
+                strong,
+                document.createTextNode(
+                    `${item.id} • ${item.platform}`
+                )
+            );
+
+            card.appendChild(info);
+
+            const actions = document.createElement('div');
+
+            actions.className = 'bookmark-actions';
+
+            const downloadButton = document.createElement('button');
+
+            downloadButton.type = 'button';
+            downloadButton.className = 'download-btn';
+            downloadButton.textContent = 'Unduh';
+            downloadButton.disabled = !downloadUrl;
+
+            downloadButton.addEventListener('click', () => {
+                triggerUniversalDownload(
+                    downloadButton,
+                    downloadUrl,
+                    item.platform,
+                    item.id
+                );
+            });
+
+            const removeButton = document.createElement('button');
+
+            removeButton.type = 'button';
+            removeButton.className = 'bookmark-remove-btn';
+            removeButton.textContent = '❌ Hapus';
+
+            removeButton.addEventListener('click', () => {
+                removeBookmark(index);
+            });
+
+            actions.append(
+                downloadButton,
+                removeButton
+            );
+
+            card.appendChild(actions);
+
+            return card;
+        }
+
+        function loadBookmarks() {
+            const gallery = document.getElementById(
+                'bookmarks-gallery'
+            );
+
+            const bookmarks = getBookmarks();
+
+            gallery.replaceChildren();
+
+            if (!bookmarks.length) {
+                const empty = document.createElement('p');
+
+                empty.className = 'bookmark-empty';
+                empty.textContent =
+                    'Belum ada gambar yang difavoritkan.';
+
+                gallery.appendChild(empty);
+                return;
+            }
+
+            const fragment = document.createDocumentFragment();
+
+            for (
+                let index = bookmarks.length - 1;
+                index >= 0;
+                index -= 1
+            ) {
+                fragment.appendChild(
+                    createBookmarkCard(
+                        bookmarks[index],
+                        index
+                    )
+                );
+            }
+
+            gallery.appendChild(fragment);
+        }
+
+        function removeBookmark(index) {
+            const bookmarks = getBookmarks();
+
+            if (
+                !Number.isInteger(index) ||
+                index < 0 ||
+                index >= bookmarks.length
+            ) {
+                return;
+            }
+
+            bookmarks.splice(index, 1);
+
+            if (!saveBookmarks(bookmarks)) {
+                showToast(
+                    'Gagal menghapus favorit.',
+                    'error'
+                );
+                return;
+            }
+
+            showToast('Favorit berhasil dihapus.');
+
+            loadBookmarks();
+        }
+
+        function clearAllBookmarks() {
+            const bookmarks = getBookmarks();
+
+            if (!bookmarks.length) {
+                return;
+            }
+
+            const confirmed = window.confirm(
+                'Apakah kamu yakin ingin menghapus semua gambar dari Favorit? Aksi ini tidak dapat dibatalkan.'
+            );
+
+            if (!confirmed) {
+                return;
+            }
+
+            localStorage.removeItem('nyanpict_bookmarks');
+
+            showToast('Semua favorit telah dibersihkan.');
+
+            loadBookmarks();
+        }
+
+        function openBookmarkOverview(url, item) {
+            const mediaUrl = normalizeUrl(url);
+
+            if (!mediaUrl) {
+                showToast('URL media tidak valid.', 'error');
+                return;
+            }
+
+            const modal = document.getElementById(
+                'bookmark-overview'
+            );
+
+            const image = document.getElementById(
+                'bookmark-overview-image'
+            );
+
+            const video = document.getElementById(
+                'bookmark-overview-video'
+            );
+
+            const info = document.getElementById(
+                'bookmark-overview-info'
+            );
+
+            const downloadButton = document.getElementById(
+                'bookmark-overview-download'
+            );
+
+            image.removeAttribute('src');
+            image.style.display = 'none';
+
+            video.pause();
+            video.removeAttribute('src');
+            video.load();
+            video.style.display = 'none';
+
+            if (isVideo(mediaUrl)) {
+                video.src = mediaUrl;
+                video.style.display = 'block';
+            } else {
+                image.src = mediaUrl;
+                image.style.display = 'block';
+            }
+
+            info.textContent =
+                `${String(item.platform).toUpperCase()} • ID ${item.id}`;
+
+            currentBookmarkOverview = {
+                url: normalizeUrl(item.download_url) || mediaUrl,
+                platform: item.platform,
+                id: item.id
+            };
+
+            downloadButton.disabled =
+                !currentBookmarkOverview.url;
+
+            downloadButton.onclick = () => {
+                if (!currentBookmarkOverview) return;
+
+                triggerUniversalDownload(
+                    downloadButton,
+                    currentBookmarkOverview.url,
+                    currentBookmarkOverview.platform,
+                    currentBookmarkOverview.id
+                );
+            };
+
+            modal.classList.add('active');
+        }
+
+        function closeBookmarkOverview() {
+            const modal = document.getElementById(
+                'bookmark-overview'
+            );
+
+            const image = document.getElementById(
+                'bookmark-overview-image'
+            );
+
+            const video = document.getElementById(
+                'bookmark-overview-video'
+            );
+
+            modal.classList.remove('active');
+
+            image.removeAttribute('src');
+
+            video.pause();
+            video.removeAttribute('src');
+            video.load();
+
+            currentBookmarkOverview = null;
+        }
+
+        document.addEventListener(
+            'DOMContentLoaded',
+            loadBookmarks,
+            { once: true }
+        );
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                closeBookmarkOverview();
+            }
+        });
+
+        document.getElementById(
+            'bookmark-overview'
+        ).addEventListener('click', (event) => {
+            if (
+                event.target.id === 'bookmark-overview'
+            ) {
+                closeBookmarkOverview();
+            }
+        });
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,1314 @@
+
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    >
+
+    <!-- CONTENT SECURITY POLICY -->
+    <meta
+        http-equiv="Content-Security-Policy"
+        content="
+            default-src 'self';
+            script-src 'self' 'unsafe-inline';
+            style-src 'self' 'unsafe-inline';
+            img-src 'self' https: data: blob:;
+            media-src 'self' https: data: blob:;
+            connect-src 'self' https:;
+            font-src 'self' https: data:;
+            object-src 'none';
+            base-uri 'self';
+            form-action 'self';
+            frame-src 'none';
+        "
+    >
+
+    <title>Pengaturan API &amp; SFW - NyanPict</title>
+
+    <link
+        rel="stylesheet"
+        href="./css/style.css"
+    >
+
+</head>
+
+<body>
+
+    <!-- ================================================== -->
+    <!-- CUSTOM TITLE BAR                                   -->
+    <!-- ================================================== -->
+
+    <div class="custom-titlebar">
+
+        <div class="titlebar-drag-region">
+            NyanPict SPA - Pengaturan API
+        </div>
+
+        <div class="titlebar-controls">
+
+            <button
+                class="window-btn minimize-btn"
+                type="button"
+                onclick="window.electronAPI?.minimize()"
+                aria-label="Minimize"
+            >
+                _
+            </button>
+
+            <button
+                class="window-btn maximize-btn"
+                type="button"
+                onclick="window.electronAPI?.maximize()"
+                aria-label="Maximize"
+            >
+                □
+            </button>
+
+            <button
+                class="window-btn close-btn"
+                type="button"
+                onclick="window.electronAPI?.close()"
+                aria-label="Close"
+            >
+                ✕
+            </button>
+
+        </div>
+
+    </div>
+
+
+    <!-- ================================================== -->
+    <!-- HEADER                                             -->
+    <!-- ================================================== -->
+
+    <header class="header">
+
+        <h1>⚙️ Pengaturan Akun &amp; API</h1>
+
+        <p>
+            Konfigurasikan akun dan API Booru untuk NyanPict.
+        </p>
+
+        <div
+            style="
+                display:flex;
+                justify-content:center;
+                gap:10px;
+                margin-top:15px;
+            "
+        >
+
+            <button
+                id="back-button"
+                type="button"
+                style="
+                    padding:10px 20px;
+                    border-radius:20px;
+                    background:#333;
+                    color:white;
+                    border:none;
+                    cursor:pointer;
+                    font-weight:bold;
+                "
+            >
+                ⬅ Kembali ke Beranda
+            </button>
+
+        </div>
+
+    </header>
+
+
+    <!-- ================================================== -->
+    <!-- MAIN SETTINGS                                      -->
+    <!-- ================================================== -->
+
+    <main
+        style="
+            padding:20px;
+            max-width:600px;
+            margin:auto;
+        "
+    >
+
+        <form
+            id="settings-form"
+            autocomplete="off"
+            novalidate
+        >
+
+
+            <!-- ========================================== -->
+            <!-- NSFW SETTINGS                              -->
+            <!-- ========================================== -->
+
+            <section
+                class="setting-group"
+                style="
+                    background:#1e1e1e;
+                    padding:20px;
+                    border-radius:8px;
+                    margin-bottom:20px;
+                "
+            >
+
+                <h3>
+                    Mode Keamanan Konten (NSFW)
+                </h3>
+
+                <p
+                    style="
+                        font-size:14px;
+                        color:var(--text-secondary,#aaa);
+                    "
+                >
+                    Aktifkan untuk mengizinkan pencarian
+                    konten eksplisit.
+                </p>
+
+
+                <label
+                    style="
+                        display:flex;
+                        align-items:center;
+                        cursor:pointer;
+                        margin-top:15px;
+                    "
+                >
+
+                    <input
+                        type="checkbox"
+                        id="nsfw-toggle"
+                        style="
+                            width:20px;
+                            height:20px;
+                            margin-right:10px;
+                            accent-color:#e63946;
+                        "
+                    >
+
+                    <span
+                        style="
+                            font-size:15px;
+                            font-weight:bold;
+                        "
+                    >
+                        Izinkan Konten NSFW 🔞
+                    </span>
+
+                </label>
+
+                <p
+                    style="
+                        font-size:12px;
+                        color:#e6a23c;
+                        margin-top:12px;
+                    "
+                >
+                    ⚠️ Pengaturan ini merupakan filter pencarian,
+                    bukan verifikasi usia.
+                </p>
+
+            </section>
+
+
+            <!-- ========================================== -->
+            <!-- API CONFIGURATION                          -->
+            <!-- ========================================== -->
+
+            <section
+                class="setting-group"
+                style="
+                    background:#1e1e1e;
+                    padding:20px;
+                    border-radius:8px;
+                    margin-bottom:20px;
+                "
+            >
+
+                <h3>
+                    Kredensial API Booru
+                </h3>
+
+                <p
+                    style="
+                        font-size:14px;
+                        color:var(--text-secondary,#aaa);
+                        margin-bottom:20px;
+                    "
+                >
+                    Masukkan User ID, Username, dan API Key
+                    yang sesuai dengan akun masing-masing.
+                </p>
+
+
+                <!-- ====================================== -->
+                <!-- GELBOORU                               -->
+                <!-- ====================================== -->
+
+                <div
+                    style="
+                        margin-bottom:25px;
+                        padding-bottom:20px;
+                        border-bottom:1px solid #383838;
+                    "
+                >
+
+                    <label
+                        style="
+                            display:block;
+                            font-size:14px;
+                            font-weight:bold;
+                            color:#ffb900;
+                            margin-bottom:10px;
+                        "
+                    >
+                        Gelbooru
+                    </label>
+
+
+                    <input
+                        type="text"
+                        id="gel-uid"
+                        placeholder="Gelbooru User ID"
+                        inputmode="numeric"
+                        autocomplete="off"
+                        spellcheck="false"
+                        style="
+                            width:100%;
+                            box-sizing:border-box;
+                            padding:10px;
+                            margin-bottom:8px;
+                            background:#333;
+                            color:white;
+                            border:1px solid #444;
+                            border-radius:4px;
+                        "
+                    >
+
+
+                    <div
+                        style="
+                            display:flex;
+                            gap:8px;
+                        "
+                    >
+
+                        <input
+                            type="password"
+                            id="gel-key"
+                            placeholder="Gelbooru API Key"
+                            autocomplete="new-password"
+                            spellcheck="false"
+                            style="
+                                flex:1;
+                                min-width:0;
+                                padding:10px;
+                                background:#333;
+                                color:white;
+                                border:1px solid #444;
+                                border-radius:4px;
+                            "
+                        >
+
+                        <button
+                            type="button"
+                            class="toggle-password"
+                            data-target="gel-key"
+                            style="
+                                padding:8px 12px;
+                                background:#444;
+                                color:white;
+                                border:none;
+                                border-radius:4px;
+                                cursor:pointer;
+                            "
+                        >
+                            👁
+                        </button>
+
+                    </div>
+
+                    <p
+                        style="
+                            font-size:11px;
+                            color:#999;
+                            margin-top:8px;
+                        "
+                    >
+                        User ID dan API Key dapat diperoleh
+                        melalui akun Gelbooru.
+                    </p>
+
+                </div>
+
+
+                <!-- ====================================== -->
+                <!-- RULE34                                  -->
+                <!-- ====================================== -->
+
+                <div
+                    style="
+                        margin-bottom:25px;
+                        padding-bottom:20px;
+                        border-bottom:1px solid #383838;
+                    "
+                >
+
+                    <label
+                        style="
+                            display:block;
+                            font-size:14px;
+                            font-weight:bold;
+                            color:#ffb900;
+                            margin-bottom:10px;
+                        "
+                    >
+                        Rule34
+                    </label>
+
+
+                    <input
+                        type="text"
+                        id="r34-uid"
+                        placeholder="Rule34 User ID"
+                        inputmode="numeric"
+                        autocomplete="off"
+                        spellcheck="false"
+                        style="
+                            width:100%;
+                            box-sizing:border-box;
+                            padding:10px;
+                            margin-bottom:8px;
+                            background:#333;
+                            color:white;
+                            border:1px solid #444;
+                            border-radius:4px;
+                        "
+                    >
+
+
+                    <div
+                        style="
+                            display:flex;
+                            gap:8px;
+                        "
+                    >
+
+                        <input
+                            type="password"
+                            id="r34-key"
+                            placeholder="Rule34 API Key (Opsional)"
+                            autocomplete="new-password"
+                            spellcheck="false"
+                            style="
+                                flex:1;
+                                min-width:0;
+                                padding:10px;
+                                background:#333;
+                                color:white;
+                                border:1px solid #444;
+                                border-radius:4px;
+                            "
+                        >
+
+                        <button
+                            type="button"
+                            class="toggle-password"
+                            data-target="r34-key"
+                            style="
+                                padding:8px 12px;
+                                background:#444;
+                                color:white;
+                                border:none;
+                                border-radius:4px;
+                                cursor:pointer;
+                            "
+                        >
+                            👁
+                        </button>
+
+                    </div>
+
+                    <p
+                        style="
+                            font-size:11px;
+                            color:#999;
+                            margin-top:8px;
+                        "
+                    >
+                        API Key dapat dikosongkan apabila
+                        tidak menggunakan autentikasi API.
+                    </p>
+
+                </div>
+
+
+                <!-- ====================================== -->
+                <!-- DANBOORU                                -->
+                <!-- ====================================== -->
+
+                <div
+                    style="
+                        margin-bottom:10px;
+                    "
+                >
+
+                    <label
+                        style="
+                            display:block;
+                            font-size:14px;
+                            font-weight:bold;
+                            color:#ffb900;
+                            margin-bottom:10px;
+                        "
+                    >
+                        Danbooru
+                    </label>
+
+
+                    <input
+                        type="text"
+                        id="dan-login"
+                        placeholder="Danbooru Username / Login"
+                        autocomplete="username"
+                        spellcheck="false"
+                        style="
+                            width:100%;
+                            box-sizing:border-box;
+                            padding:10px;
+                            margin-bottom:8px;
+                            background:#333;
+                            color:white;
+                            border:1px solid #444;
+                            border-radius:4px;
+                        "
+                    >
+
+
+                    <div
+                        style="
+                            display:flex;
+                            gap:8px;
+                        "
+                    >
+
+                        <input
+                            type="password"
+                            id="dan-key"
+                            placeholder="Danbooru API Key"
+                            autocomplete="new-password"
+                            spellcheck="false"
+                            style="
+                                flex:1;
+                                min-width:0;
+                                padding:10px;
+                                background:#333;
+                                color:white;
+                                border:1px solid #444;
+                                border-radius:4px;
+                            "
+                        >
+
+                        <button
+                            type="button"
+                            class="toggle-password"
+                            data-target="dan-key"
+                            style="
+                                padding:8px 12px;
+                                background:#444;
+                                color:white;
+                                border:none;
+                                border-radius:4px;
+                                cursor:pointer;
+                            "
+                        >
+                            👁
+                        </button>
+
+                    </div>
+
+                    <p
+                        style="
+                            font-size:11px;
+                            color:#999;
+                            margin-top:8px;
+                        "
+                    >
+                        Gunakan username dan API Key
+                        dari akun Danbooru.
+                    </p>
+
+                </div>
+
+            </section>
+
+
+            <!-- ========================================== -->
+            <!-- SECURITY NOTICE                            -->
+            <!-- ========================================== -->
+
+            <section
+                style="
+                    background:#292313;
+                    border:1px solid #66521b;
+                    padding:15px;
+                    border-radius:8px;
+                    margin-bottom:20px;
+                "
+            >
+
+                <p
+                    style="
+                        font-size:12px;
+                        color:#e6c777;
+                        line-height:1.6;
+                        margin:0;
+                    "
+                >
+                    🔐 <strong>Informasi keamanan:</strong>
+                    Kredensial disimpan di localStorage aplikasi.
+                    Penyimpanan ini bukan brankas rahasia dan
+                    kredensial masih dapat diakses melalui
+                    DevTools atau file profil aplikasi.
+                    Jangan membagikan folder data aplikasi
+                    kepada orang lain.
+                </p>
+
+            </section>
+
+
+            <!-- ========================================== -->
+            <!-- SAVE BUTTON                                -->
+            <!-- ========================================== -->
+
+            <button
+                type="submit"
+                id="save-settings-button"
+                style="
+                    width:100%;
+                    padding:14px;
+                    background:#e63946;
+                    color:white;
+                    border:none;
+                    border-radius:8px;
+                    font-size:15px;
+                    font-weight:bold;
+                    cursor:pointer;
+                "
+            >
+                💾 Simpan Pengaturan
+            </button>
+
+
+            <!-- CLEAR CREDENTIALS BUTTON -->
+
+            <button
+                type="button"
+                id="clear-settings-button"
+                style="
+                    width:100%;
+                    padding:12px;
+                    margin-top:10px;
+                    background:#333;
+                    color:#fff;
+                    border:1px solid #555;
+                    border-radius:8px;
+                    font-size:13px;
+                    cursor:pointer;
+                "
+            >
+                Hapus Semua Kredensial API
+            </button>
+
+
+        </form>
+
+    </main>
+
+
+    <!-- ================================================== -->
+    <!-- TOAST NOTIFICATION                                 -->
+    <!-- ================================================== -->
+
+    <div
+        id="toast-container"
+        role="status"
+        aria-live="polite"
+        style="
+            position:fixed;
+            bottom:20px;
+            left:50%;
+            transform:translateX(-50%);
+            z-index:1000;
+            display:flex;
+            flex-direction:column;
+            gap:10px;
+        "
+    ></div>
+
+
+    <!-- ================================================== -->
+    <!-- SETTINGS JAVASCRIPT                                -->
+    <!-- ================================================== -->
+
+    <script>
+
+        'use strict';
+
+
+        // ================================================
+        // STORAGE KEYS
+        // Harus sama dengan src/js/main.js
+        // ================================================
+
+        const STORAGE_KEYS = Object.freeze({
+
+            nsfw: 'nyanpict_nsfw',
+
+            gelUid: 'nyanpict_gel_uid',
+
+            gelKey: 'nyanpict_gel_key',
+
+            r34Uid: 'nyanpict_r34_uid',
+
+            r34Key: 'nyanpict_r34_key',
+
+            danLogin: 'nyanpict_dan_login',
+
+            danKey: 'nyanpict_dan_key'
+
+        });
+
+
+        // ================================================
+        // ELEMENT HELPER
+        // ================================================
+
+        function getElement(id) {
+
+            return document.getElementById(id);
+
+        }
+
+
+        function readInput(id) {
+
+            const element = getElement(id);
+
+            return element
+                ? element.value.trim()
+                : '';
+
+        }
+
+
+        function writeInput(id, value) {
+
+            const element = getElement(id);
+
+            if (element) {
+
+                element.value = value || '';
+
+            }
+
+        }
+
+
+        // ================================================
+        // LOAD SAVED SETTINGS
+        // ================================================
+
+        function loadSettings() {
+
+            try {
+
+                const nsfwToggle = getElement(
+                    'nsfw-toggle'
+                );
+
+                if (nsfwToggle) {
+
+                    nsfwToggle.checked =
+                        localStorage.getItem(
+                            STORAGE_KEYS.nsfw
+                        ) === 'true';
+
+                }
+
+
+                // GELBOORU
+
+                writeInput(
+                    'gel-uid',
+                    localStorage.getItem(
+                        STORAGE_KEYS.gelUid
+                    )
+                );
+
+                writeInput(
+                    'gel-key',
+                    localStorage.getItem(
+                        STORAGE_KEYS.gelKey
+                    )
+                );
+
+
+                // RULE34
+
+                writeInput(
+                    'r34-uid',
+                    localStorage.getItem(
+                        STORAGE_KEYS.r34Uid
+                    )
+                );
+
+                writeInput(
+                    'r34-key',
+                    localStorage.getItem(
+                        STORAGE_KEYS.r34Key
+                    )
+                );
+
+
+                // DANBOORU
+
+                writeInput(
+                    'dan-login',
+                    localStorage.getItem(
+                        STORAGE_KEYS.danLogin
+                    )
+                );
+
+                writeInput(
+                    'dan-key',
+                    localStorage.getItem(
+                        STORAGE_KEYS.danKey
+                    )
+                );
+
+
+            } catch (error) {
+
+                console.error(
+                    '[NyanPict Settings] Gagal memuat pengaturan:',
+                    error
+                );
+
+                showToast(
+                    'Gagal membaca pengaturan tersimpan.',
+                    'error'
+                );
+
+            }
+
+        }
+
+
+        // ================================================
+        // VALIDATE CREDENTIALS
+        // ================================================
+
+        function validateSettings() {
+
+            const gelUid = readInput('gel-uid');
+
+            const gelKey = readInput('gel-key');
+
+            const r34Uid = readInput('r34-uid');
+
+            const r34Key = readInput('r34-key');
+
+            const danLogin = readInput('dan-login');
+
+            const danKey = readInput('dan-key');
+
+
+            // GELBOORU
+
+            if (
+                (gelUid && !gelKey) ||
+                (!gelUid && gelKey)
+            ) {
+
+                return {
+                    valid: false,
+                    message: 'Gelbooru: User ID dan API Key harus diisi berpasangan.'
+                };
+
+            }
+
+            if (
+                gelUid &&
+                !/^\d+$/.test(gelUid)
+            ) {
+
+                return {
+                    valid: false,
+                    message: 'Gelbooru User ID harus berupa angka.'
+                };
+
+            }
+
+
+            // RULE34
+
+            if (
+                (r34Uid && !r34Key) ||
+                (!r34Uid && r34Key)
+            ) {
+
+                return {
+                    valid: false,
+                    message: 'Rule34: User ID dan API Key harus diisi berpasangan atau dikosongkan.'
+                };
+
+            }
+
+            if (
+                r34Uid &&
+                !/^\d+$/.test(r34Uid)
+            ) {
+
+                return {
+                    valid: false,
+                    message: 'Rule34 User ID harus berupa angka.'
+                };
+
+            }
+
+
+            // DANBOORU
+
+            if (
+                (danLogin && !danKey) ||
+                (!danLogin && danKey)
+            ) {
+
+                return {
+                    valid: false,
+                    message: 'Danbooru: Username dan API Key harus diisi berpasangan.'
+                };
+
+            }
+
+
+            return {
+                valid: true,
+                message: ''
+            };
+
+        }
+
+
+        // ================================================
+        // SAVE SETTINGS
+        // ================================================
+
+        function saveSettings() {
+
+            const validation = validateSettings();
+
+            if (!validation.valid) {
+
+                showToast(
+                    validation.message,
+                    'error'
+                );
+
+                return;
+
+            }
+
+
+            try {
+
+                const settings = {
+
+                    [STORAGE_KEYS.nsfw]:
+
+                        getElement('nsfw-toggle').checked
+                            ? 'true'
+                            : 'false',
+
+
+                    [STORAGE_KEYS.gelUid]:
+
+                        readInput('gel-uid'),
+
+
+                    [STORAGE_KEYS.gelKey]:
+
+                        readInput('gel-key'),
+
+
+                    [STORAGE_KEYS.r34Uid]:
+
+                        readInput('r34-uid'),
+
+
+                    [STORAGE_KEYS.r34Key]:
+
+                        readInput('r34-key'),
+
+
+                    [STORAGE_KEYS.danLogin]:
+
+                        readInput('dan-login'),
+
+
+                    [STORAGE_KEYS.danKey]:
+
+                        readInput('dan-key')
+
+                };
+
+
+                // Simpan semua data.
+
+                for (
+                    const [key, value]
+                    of Object.entries(settings)
+                ) {
+
+                    localStorage.setItem(
+                        key,
+                        value
+                    );
+
+                }
+
+
+                showToast(
+                    'Pengaturan berhasil disimpan!',
+                    'success'
+                );
+
+
+                // Kembali ke halaman utama.
+
+                window.setTimeout(() => {
+
+                    window.location.href = './index.html';
+
+                }, 900);
+
+
+            } catch (error) {
+
+                console.error(
+                    '[NyanPict Settings] Gagal menyimpan:',
+                    error
+                );
+
+                showToast(
+                    'Gagal menyimpan pengaturan. Periksa penyimpanan aplikasi.',
+                    'error'
+                );
+
+            }
+
+        }
+
+
+        // ================================================
+        // CLEAR API CREDENTIALS
+        // ================================================
+
+        function clearCredentials() {
+
+            const confirmed = window.confirm(
+                'Apakah kamu yakin ingin menghapus seluruh kredensial API? Pengaturan NSFW tidak akan dihapus.'
+            );
+
+            if (!confirmed) {
+
+                return;
+
+            }
+
+
+            try {
+
+                const credentialKeys = [
+
+                    STORAGE_KEYS.gelUid,
+
+                    STORAGE_KEYS.gelKey,
+
+                    STORAGE_KEYS.r34Uid,
+
+                    STORAGE_KEYS.r34Key,
+
+                    STORAGE_KEYS.danLogin,
+
+                    STORAGE_KEYS.danKey
+
+                ];
+
+
+                credentialKeys.forEach((key) => {
+
+                    localStorage.removeItem(key);
+
+                });
+
+
+                // Kosongkan formulir.
+
+                writeInput('gel-uid', '');
+
+                writeInput('gel-key', '');
+
+                writeInput('r34-uid', '');
+
+                writeInput('r34-key', '');
+
+                writeInput('dan-login', '');
+
+                writeInput('dan-key', '');
+
+
+                showToast(
+                    'Seluruh kredensial API berhasil dihapus.',
+                    'success'
+                );
+
+
+            } catch (error) {
+
+                console.error(
+                    '[NyanPict Settings] Gagal menghapus kredensial:',
+                    error
+                );
+
+                showToast(
+                    'Gagal menghapus kredensial.',
+                    'error'
+                );
+
+            }
+
+        }
+
+
+        // ================================================
+        // SHOW / HIDE API KEY
+        // ================================================
+
+        function initializePasswordButtons() {
+
+            const buttons = document.querySelectorAll(
+                '.toggle-password'
+            );
+
+            buttons.forEach((button) => {
+
+                button.addEventListener(
+                    'click',
+                    () => {
+
+                        const targetId =
+                            button.dataset.target;
+
+                        const input = getElement(
+                            targetId
+                        );
+
+                        if (!input) {
+
+                            return;
+
+                        }
+
+
+                        if (input.type === 'password') {
+
+                            input.type = 'text';
+
+                            button.textContent = '🙈';
+
+                            button.setAttribute(
+                                'aria-label',
+                                'Sembunyikan API Key'
+                            );
+
+                        } else {
+
+                            input.type = 'password';
+
+                            button.textContent = '👁';
+
+                            button.setAttribute(
+                                'aria-label',
+                                'Tampilkan API Key'
+                            );
+
+                        }
+
+                    }
+                );
+
+            });
+
+        }
+
+
+        // ================================================
+        // TOAST NOTIFICATION
+        // ================================================
+
+        function showToast(
+            message,
+            type = 'success'
+        ) {
+
+            const container = getElement(
+                'toast-container'
+            );
+
+            if (!container) {
+
+                console.log(message);
+
+                return;
+
+            }
+
+
+            const toast = document.createElement('div');
+
+            toast.textContent = String(message);
+
+            toast.style.cssText = `
+
+                padding: 10px 20px;
+
+                border-radius: 5px;
+
+                color: #fff;
+
+                background:
+                    ${type === 'error'
+                        ? '#e63946'
+                        : '#2a9d8f'};
+
+                box-shadow:
+                    0 3px 12px rgba(0,0,0,0.3);
+
+                font-size: 13px;
+
+                max-width: 90vw;
+
+            `;
+
+
+            container.appendChild(toast);
+
+
+            window.setTimeout(() => {
+
+                toast.remove();
+
+            }, 4000);
+
+        }
+
+
+        // ================================================
+        // INITIALIZATION
+        // ================================================
+
+        document.addEventListener(
+            'DOMContentLoaded',
+            () => {
+
+                // Load saved settings.
+
+                loadSettings();
+
+
+                // Password visibility.
+
+                initializePasswordButtons();
+
+
+                // Save form.
+
+                const settingsForm = getElement(
+                    'settings-form'
+                );
+
+                if (settingsForm) {
+
+                    settingsForm.addEventListener(
+                        'submit',
+                        (event) => {
+
+                            event.preventDefault();
+
+                            saveSettings();
+
+                        }
+                    );
+
+                }
+
+
+                // Clear credentials.
+
+                const clearButton = getElement(
+                    'clear-settings-button'
+                );
+
+                if (clearButton) {
+
+                    clearButton.addEventListener(
+                        'click',
+                        clearCredentials
+                    );
+
+                }
+
+
+                // Return to home.
+
+                const backButton = getElement(
+                    'back-button'
+                );
+
+                if (backButton) {
+
+                    backButton.addEventListener(
+                        'click',
+                        () => {
+
+                            window.location.href =
+                                './index.html';
+
+                        }
+                    );
+
+                }
+
+
+                console.log(
+                    '[NyanPict Settings] Pengaturan berhasil diinisialisasi.'
+                );
+
+            },
+            { once: true }
+        );
+
+    </script>
+
+</body>
+
+</html>
