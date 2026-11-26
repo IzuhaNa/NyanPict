@@ -1,4 +1,3 @@
-$gitignore = @'
 # Dependencies
 node_modules/
 
@@ -15,7 +14,9 @@ android/app/build/
 android/build/
 android/capacitor-cordova-android-plugins/build/
 
-# Environment variables and secrets
+# Sensitive user data & credentials
+user_data/
+api_keys.json
 .env
 .env.*
 !.env.example
@@ -57,18 +58,10 @@ desktop.ini
 *.tmp
 *.bak
 *.backup
-'@
+*.backup-*
+push_out.txt
+push_err.txt
 
-# Capacitor generated web assets
-android/app/src/main/assets/public/
-android/app/src/main/assets/capacitor.config.json
-
-$utf8 = New-Object System.Text.UTF8Encoding($false)
-[System.IO.File]::WriteAllText(
-    (Join-Path (Get-Location) ".gitignore"),
-    $gitignore,
-    $utf8
-)
 # Capacitor generated web assets
 android/app/src/main/assets/public/
 android/app/src/main/assets/capacitor.config.json
