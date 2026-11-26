@@ -1,7 +1,7 @@
 
 {
   "name": "nyanpict",
-  "version": "1.0.0",
+  "version": "1.0.0.1",
   "description": "NyanPict - Booru Image Gallery",
   "main": "electron-main.js",
   "scripts": {
