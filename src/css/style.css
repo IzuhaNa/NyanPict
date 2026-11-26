@@ -166,10 +166,8 @@ button:disabled {
 .masonry-item video {
     width: 100%;
     display: block;
-    filter: blur(15px);
     opacity: 0;
     transition:
-        filter 0.5s ease-out,
         opacity 0.5s ease-in-out;
     background-color: var(--bg-card);
 }
@@ -387,6 +385,40 @@ button:disabled {
     color: #fff;
 }
 
+.overview-openweb-btn:hover {
+    background: #21867c;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+
+.overview-close-btn:hover {
+    background: #444;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+
+.overview-actions button:active {
+    transform: scale(0.96);
+}
+
+.lightbox-overlay.active .lightbox-close:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+#ai-toggle-label:hover {
+    background: #21867c;
+    transform: translateY(-50%) scale(1.05);
+}
+
+#ai-toggle-label:active {
+    transform: translateY(-50%) scale(0.97);
+}
+
+@media (max-width: 600px) {
+    #ai-toggle-label {
+        font-size: 11px;
+        padding: 4px 7px;
+    }
+}
+
 .overview-close-btn {
     background: #333;
     color: #fff;
@@ -540,3 +572,17 @@ button:disabled {
         right: 15px;
     }
 }
+ 
+ #ai-toggle-label {
+    background: #333;
+    color: #fff;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: bold;
+    font-size: 11px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+#ai-toggle-label { background: #333; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 11px; cursor: pointer; transition: background 0.2s; }
+#ai-toggle-label:hover { background: #555; }

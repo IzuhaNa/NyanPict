@@ -47,7 +47,44 @@ const ALLOWED_HOSTS = [
 let mainWindow = null;
 
 // ============================================================
-// 2. HOST VALIDATION
+// 2. API KEY STORAGE (SECURE: only main process access)
+// ============================================================
+// API Key Storage
+const STORAGE_PATH = path.join(__dirname, 'user_data', 'api_keys.json');
+let apiKeys = { gelbooru: '', rule34: '', danbooru: '' };
+try {
+    const data = fs.readFileSync(STORAGE_PATH, 'utf8');
+    apiKeys = JSON.parse(data);
+} catch (e) {
+    console.warn('[NyanPict] Tidak bisa membaca API key lama, mulai baru.');
+}
+
+function saveApiKeys() {
+    try {
+        fs.writeFileSync(STORAGE_PATH, JSON.stringify(apiKeys), 'utf8');
+    } catch (e) {
+        console.error('[NyanPict] Gagal simpan API key:', e);
+    }
+}
+
+function getApiKey(source) {
+    return apiKeys[source] || '';
+}
+
+function setApiKey(source, key) {
+    apiKeys[source] = key || '';
+    saveApiKeys();
+}
+
+function hasApiKey(source) {
+    return apiKeys[source] && apiKeys[source].trim().length > 0;
+}
+
+// Rate Limit Tracking: { source: { lastRequestTime: timestamp, cooldownExpiry: timestamp } }
+let requestTimestamps = {};
+
+// ============================================================
+// 3. HOST VALIDATION
 // ============================================================
 
 function isAllowedHost(hostname) {
@@ -580,7 +617,165 @@ console.log(
 );
 
 // ============================================================
-// 9. CREATE WINDOW
+// 9. IPC HANDLERS - API KEY STORAGE
+// ============================================================
+
+ipcMain.handle('api-key:get', async (event, source) => {
+    console.log(`[NyanPict] IPC api-key:get diterima untuk ${source}`);
+    return getApiKey(source);
+});
+
+ipcMain.handle('api-key:set', async (event, source, key) => {
+    console.log(`[NyanPict] IPC api-key:set diterima untuk ${source}`);
+    setApiKey(source, key);
+    return true;
+});
+
+ipcMain.handle('api-key:has', async (event, source) => {
+    console.log(`[NyanPict] IPC api-key:has diterima untuk ${source}`);
+    return hasApiKey(source);
+});
+
+console.log(
+    '[NyanPict] Handlers api-key:get, set, has berhasil didaftarkan.'
+);
+
+// ============================================================
+// 10. DNS OVERRIDE FUNCTIONALITY
+// ============================================================
+
+const DNS_SERVERS = {
+    google: ['8.8.8.8', '8.8.4.4'],
+    cloudflare: ['1.1.1.1', '1.0.0.1'],
+    opendns: ['208.67.222.222', '208.67.220.220']
+};
+
+const BLOCKED_DOMAINS = [
+    'gelbooru.com',
+    'rule34.xxx',
+    'donmai.us',
+    'danbooru.donmai.us'
+];
+
+function getHostsPath() {
+    if (process.platform === 'win32') {
+        return 'C:\\Windows\\System32\\drivers\\etc\\hosts';
+    }
+    return '/etc/hosts';
+}
+
+function generateHostsEntries() {
+    const entries = [];
+    BLOCKED_DOMAINS.forEach(domain => {
+        DNS_SERVERS.google.forEach(ip => {
+            entries.push(`${ip} ${domain}`);
+        });
+    });
+    return entries.join('\n');
+}
+
+async function applyDnsOverride(dnsProvider) {
+    if (!dnsProvider || !DNS_SERVERS[dnsProvider]) {
+        return { success: false, error: 'Provider DNS tidak valid.' };
+    }
+
+    try {
+        const hostsPath = getHostsPath();
+        let hostsContent = '';
+
+        try {
+            hostsContent = await fs.readFile(hostsPath, 'utf8');
+        } catch (e) {
+            hostsContent = '';
+        }
+
+        const ips = DNS_SERVERS[dnsProvider];
+        const markerStart = '# NYANPICT DNS OVERRIDE START';
+        const markerEnd = '# NYANPICT DNS OVERRIDE END';
+
+        const newEntries = BLOCKED_DOMAINS.map(domain => {
+            return ips.map(ip => `${ip} ${domain}`).join('\n');
+        }).join('\n');
+
+        const overrideBlock = `${markerStart}\n${newEntries}\n${markerEnd}\n`;
+
+        let newHostsContent;
+        if (hostsContent.includes(markerStart) && hostsContent.includes(markerEnd)) {
+            newHostsContent = hostsContent.replace(
+                new RegExp(`${markerStart}[\\s\\S]*?${markerEnd}\\n?`),
+                overrideBlock
+            );
+        } else {
+            newHostsContent = hostsContent.trimEnd() + '\n\n' + overrideBlock;
+        }
+
+        await fs.writeFile(hostsPath, newHostsContent, 'utf8');
+        console.log(`[NyanPict] DNS Override diterapkan: ${dnsProvider}`);
+        return { success: true, dnsProvider };
+
+    } catch (error) {
+        console.error('[NyanPict] Gagal menerapkan DNS Override:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+async function removeDnsOverride() {
+    try {
+        const hostsPath = getHostsPath();
+        let hostsContent = '';
+
+        try {
+            hostsContent = await fs.readFile(hostsPath, 'utf8');
+        } catch (e) {
+            return { success: true };
+        }
+
+        const markerStart = '# NYANPICT DNS OVERRIDE START';
+        const markerEnd = '# NYANPICT DNS OVERRIDE END';
+
+        if (hostsContent.includes(markerStart) && hostsContent.includes(markerEnd)) {
+            const newHostsContent = hostsContent.replace(
+                new RegExp(`\\n?${markerStart}[\\s\\S]*?${markerEnd}\\n?`),
+                ''
+            );
+            await fs.writeFile(hostsPath, newHostsContent, 'utf8');
+            console.log('[NyanPict] DNS Override dihapus.');
+        }
+        return { success: true };
+
+    } catch (error) {
+        console.error('[NyanPict] Gagal menghapus DNS Override:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+ipcMain.handle('dns-override:apply', async (event, provider) => {
+    console.log(`[NyanPict] IPC dns-override:apply diterima untuk ${provider}`);
+    return await applyDnsOverride(provider);
+});
+
+ipcMain.handle('dns-override:remove', async () => {
+    console.log('[NyanPict] IPC dns-override:remove diterima');
+    return await removeDnsOverride();
+});
+
+ipcMain.handle('dns-override:status', async () => {
+    try {
+        const hostsPath = getHostsPath();
+        const hostsContent = await fs.readFile(hostsPath, 'utf8');
+        const markerStart = '# NYANPICT DNS OVERRIDE START';
+        return { active: hostsContent.includes(markerStart) };
+    } catch {
+        return { active: false };
+    }
+});
+
+console.log(
+    '[NyanPict] Handlers dns-override:apply, remove, status berhasil didaftarkan.'
+);
+
+// ============================================================
+// 11. CREATE WINDOW
 // ============================================================
 
 function createWindow() {

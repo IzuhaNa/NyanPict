@@ -52,6 +52,39 @@ contextBridge.exposeInMainWorld(
                     listener
                 );
             };
+        },
+
+        // ============================================================
+        // DNS OVERRIDE
+        // ============================================================
+        applyDnsOverride: (provider) => {
+            return ipcRenderer.invoke('dns-override:apply', provider);
+        },
+
+        removeDnsOverride: () => {
+            return ipcRenderer.invoke('dns-override:remove');
+        },
+
+        getDnsOverrideStatus: () => {
+            return ipcRenderer.invoke('dns-override:status');
+        },
+
+        // ============================================================
+        // API KEY STORAGE (Secure: stored in main process only)
+        // ============================================================
+        getApiKey: (source) => {
+            if (typeof source !== 'string') return '';
+            return ipcRenderer.invoke('api-key:get', source);
+        },
+
+        setApiKey: (source, key) => {
+            if (typeof source !== 'string') return;
+            return ipcRenderer.invoke('api-key:set', source, key);
+        },
+
+        hasApiKey: (source) => {
+            if (typeof source !== 'string') return false;
+            return ipcRenderer.invoke('api-key:has', source);
         }
     })
 );

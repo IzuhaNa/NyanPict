@@ -12,22 +12,17 @@ let isLoading = false;
 let isEndOfResults = false;
 let currentSource = 'all';
 let currentTags = '';
+let isNsfw = getStorageItem('nyanpict_nsfw') === 'true'; // Use stored value
 
 let activeFeedController = null;
 let feedRequestId = 0;
 let currentLightboxData = null;
 
+// Current view size: baca dari localStorage, default 50
+// Ini diproses lagi di initializeNyanPict() setelah DOM ready,
+let currentViewSize = Number(getStorageItem('nyanpict_view_size') || 50);
 
-// ============================================================
-// 1. API CONFIGURATION
-// ============================================================
-
-const BOORU_API = Object.freeze({
-    gelbooru: 'https://gelbooru.com/index.php',
-    rule34: 'https://api.rule34.xxx/index.php',
-    danbooru: 'https://danbooru.donmai.us/posts.json'
-});
-
+// API Policy & Rate Limit Tracking
 const API_POLICY = Object.freeze({
     gelbooru: {
         minIntervalMs: 3000,
@@ -38,9 +33,23 @@ const API_POLICY = Object.freeze({
         defaultCooldownMs: 90000
     },
     danbooru: {
-        minIntervalMs: 1200,
+        minIntervalMs: 100, // Danbooru is usually faster
         defaultCooldownMs: 60000
     }
+});
+
+// Rate Limit Tracking: { source: { lastRequestTime: timestamp, cooldownExpiry: timestamp } }
+let requestTimestamps = {};
+
+
+// ============================================================
+// 1. API CONFIGURATION
+// ============================================================
+
+const BOORU_API = Object.freeze({
+    gelbooru: 'https://gelbooru.com/index.php',
+    rule34: 'https://api.rule34.xxx/index.php',
+    danbooru: 'https://danbooru.donmai.us/posts.json'
 });
 
 const apiRequestStates = new Map();
@@ -663,6 +672,12 @@ async function fetchBooruPosts(
         );
 
         sourceErrors.delete(source);
+
+        // Track request timestamp for rate limiting
+        if (!requestTimestamps[currentSource]) {
+            requestTimestamps[currentSource] = {};
+        }
+        requestTimestamps[currentSource].lastRequestTime = Date.now();
 
         return normalizeBooruData(
             source,
@@ -1570,13 +1585,15 @@ async function loadFeed(isNew = false) {
         return;
     }
 
+    // Inisialisasi filter AI (baca dari localStorage)
+    const aiFilterOn = getStorageItem('nyanpict_ai_filter') !== 'false';
+
     if (isNew) {
         if (activeFeedController) {
             activeFeedController.abort();
         }
 
         feedRequestId += 1;
-        currentPage = 1;
         isEndOfResults = false;
 
         sourceErrors.clear();
@@ -1593,6 +1610,24 @@ async function loadFeed(isNew = false) {
 
     const requestId = feedRequestId;
 
+    // Rate Limit Check: skip if source is in cooldown
+    const now = Date.now();
+    const policy = API_POLICY[currentSource];
+    if (policy && requestTimestamps[currentSource]) {
+        const timeSinceLast = now - requestTimestamps[currentSource].lastRequestTime;
+        const minInterval = policy.minIntervalMs;
+        if (timeSinceLast < minInterval) {
+            const waitTime = minInterval - timeSinceLast;
+            showToast(
+                `Rate limit: tunggu ${Math.ceil(waitTime / 1000)} detik lagi.`,
+                'warning'
+            );
+            // Wait and retry
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+            requestTimestamps[currentSource].lastRequestTime = Date.now();
+        }
+    }
+
     const controller = new AbortController();
 
     activeFeedController = controller;
@@ -1600,6 +1635,11 @@ async function loadFeed(isNew = false) {
 
     try {
         let data = [];
+
+        // Determine per-source limit: when 'all', split viewSize across sources
+        const sourceCount = currentSource === 'all' ? 2 : 1;
+        const perSourceLimit = Math.ceil(currentViewSize / sourceCount);
+        const targetPage = Math.max(1, currentPage); // buildBooruApiUrl expects 1-indexed page
 
         if (currentSource === 'all') {
             const [
@@ -1609,34 +1649,34 @@ async function loadFeed(isNew = false) {
                 fetchBooruPosts(
                     'gelbooru',
                     currentTags,
-                    8,
-                    currentPage,
+                    perSourceLimit,
+                    targetPage,
                     controller.signal
                 ),
 
                 fetchBooruPosts(
                     'rule34',
                     currentTags,
-                    8,
-                    currentPage,
+                    perSourceLimit,
+                    targetPage,
                     controller.signal
                 )
             ]);
 
-            data = shuffleArray([
+            data = [
                 ...gelbooruPosts,
                 ...rule34Posts
-            ]);
+            ].slice(0, currentViewSize);
         }
 
         else {
-            data = await fetchBooruPosts(
+            data = (await fetchBooruPosts(
                 currentSource,
                 currentTags,
-                10,
-                currentPage,
+                perSourceLimit,
+                targetPage,
                 controller.signal
-            );
+            )).slice(0, currentViewSize);
         }
 
         if (
@@ -1661,6 +1701,15 @@ async function loadFeed(isNew = false) {
         const fragment = document.createDocumentFragment();
 
         data.forEach((item) => {
+            // Filter AI: lewati item jika AI filter OFF dan tag mengandung 'ai'
+            if (!aiFilterOn && item.tags) {
+                // Regex yang lebih kuat: match "ai", "ai-generated", "ai_art", "ai_" dll
+                const hasAiTag = item.tags.split(/\s+/).some(t => /\bai[_-]?\w*/i.test(t) || /^ai$/i.test(t));
+                if (hasAiTag) {
+                    return; // Lewati item ini (jangan tampilkan di gallery)
+                }
+            }
+
             fragment.appendChild(
                 createPostCard(item)
             );
@@ -1668,7 +1717,8 @@ async function loadFeed(isNew = false) {
 
         gallery.appendChild(fragment);
 
-        currentPage += 1;
+        // Preload images for next page chunk
+        preloadNextPageImages(data);
 
     } catch (error) {
         if (
@@ -1697,6 +1747,52 @@ async function loadFeed(isNew = false) {
     }
 }
 
+
+// ============================================================
+// 20.5. THUMBNAIL PRELOAD
+// ============================================================
+
+const preloadCache = new Map(); // url -> { img, decoded }
+
+function preloadImage(url) {
+    if (!url || preloadCache.has(url)) {
+        return preloadCache.get(url);
+    }
+
+    const img = new Image();
+    img.src = url;
+    img.decoding = 'async';
+    img.referrerPolicy = 'strict-origin-when-cross-origin';
+
+    const entry = { img, decoded: false };
+    preloadCache.set(url, entry);
+
+    if (img.decode) {
+        img.decode()
+            .then(() => { entry.decoded = true; })
+            .catch(() => { /* image may still load */ });
+    }
+
+    // Limit cache to 200 entries (LRU-ish: oldest removed)
+    if (preloadCache.size > 200) {
+        const firstKey = preloadCache.keys().next().value;
+        preloadCache.delete(firstKey);
+    }
+
+    return entry;
+}
+
+function preloadNextPageImages(data) {
+    // Preload preview URLs for the next chunk of images not yet in DOM
+    // Limit: only preload up to 10 extra images to avoid blocking main thread
+    const maxPreload = 10;
+    const urls = data
+        .slice(0, maxPreload)
+        .map(item => normalizeRemoteUrl(item.preview_url))
+        .filter(Boolean);
+
+    urls.forEach(url => preloadImage(url));
+}
 
 // ============================================================
 // 21. DOWNLOAD MIME DETECTION
@@ -1881,6 +1977,12 @@ async function triggerUniversalDownload(
         buttonElement.disabled = true;
     }
 
+    // Show progress toast
+    const progressToast = showToast(
+        `Mengunduh ${platform}_${id}...`,
+        'info'
+    );
+
     try {
         console.log(
             '[NyanPict] Memulai download:',
@@ -1910,7 +2012,8 @@ async function triggerUniversalDownload(
         if (result.canceled) {
             showToast(
                 'Download dibatalkan.',
-                'error'
+                'error',
+                progressToast
             );
 
             return;
@@ -1933,7 +2036,8 @@ async function triggerUniversalDownload(
 
         showToast(
             `Berhasil disimpan: ${fileName}`,
-            'success'
+            'success',
+            progressToast
         );
 
     } catch (error) {
@@ -1944,7 +2048,8 @@ async function triggerUniversalDownload(
 
         showToast(
             `Download gagal: ${error.message || 'Kesalahan tidak diketahui.'}`,
-            'error'
+            'error',
+            progressToast
         );
 
     } finally {
@@ -2116,16 +2221,143 @@ function showSuggestions(filterText = '') {
 
     dropdown.replaceChildren();
 
-    const normalizedFilter = String(
-        filterText || ''
-    ).toLowerCase();
+    // Coba API booru dulu jika filter tidak kosong
+    if (filterText && filterText.trim()) {
+        fetchBooruAutocomplete(filterText.trim())
+            .then((tags) => {
+                const normalizedFilter = String(filterText || '').toLowerCase();
 
+                // Filter hasil API sesuai filter text
+                const matchedTags = tags.filter(
+                    (tag) =>
+                        tag.name.toLowerCase().includes(normalizedFilter) ||
+                        tag.category.toLowerCase().includes(normalizedFilter)
+                );
+
+                if (matchedTags.length === 0) {
+                    // Jika API tidak ada, gunakan history
+                    const filteredHistory = getSearchHistory().filter(
+                        (item) =>
+                            item
+                                .toLowerCase()
+                                .includes(normalizedFilter)
+                    );
+
+                    if (!filteredHistory.length) {
+                        dropdown.style.display = 'none';
+                        return;
+                    }
+
+                    filteredHistory.forEach((item) => {
+                        const suggestion = document.createElement('div');
+
+                        suggestion.textContent = item;
+
+                        suggestion.style.cssText =
+                            'padding:10px;cursor:pointer;border-bottom:1px solid #444;color:#fff;';
+
+                        suggestion.addEventListener('click', () => {
+                            const tagInput = document.getElementById(
+                                'tag-input'
+                            );
+
+                            if (tagInput) {
+                                tagInput.value = item;
+                            }
+
+                            dropdown.style.display = 'none';
+
+                            applySearch();
+                        });
+
+                        dropdown.appendChild(suggestion);
+                    });
+
+                    dropdown.style.display = 'block';
+                    return;
+                }
+
+                // Render tag dari API dengan post count
+                matchedTags.forEach((tag) => {
+                    const suggestion = document.createElement('div');
+
+                    suggestion.textContent =
+                        `${tag.name} (${tag.post_count} posts)`;
+
+                    suggestion.style.cssText =
+                        'padding:8px 12px;cursor:pointer;border-bottom:1px solid #555;color:#eee;font-size:11px;';
+
+                    suggestion.addEventListener('click', () => {
+                        const tagInput = document.getElementById(
+                            'tag-input'
+                        );
+
+                        if (tagInput) {
+                            tagInput.value = tag.name;
+                        }
+
+                        dropdown.style.display = 'none';
+
+                        applySearch();
+                    });
+
+                    dropdown.appendChild(suggestion);
+                });
+
+                dropdown.style.display = 'block';
+            })
+            .catch((error) => {
+                console.error('[NyanPict] Error fetching autocomplete:', error);
+
+                // Jika gagal API, turun ke history
+                const filteredHistory = getSearchHistory().filter(
+                    (item) =>
+                        item
+                            .toLowerCase()
+                            .includes(filterText.toLowerCase())
+                );
+
+                if (!filteredHistory.length) {
+                    dropdown.style.display = 'none';
+                    return;
+                }
+
+                filteredHistory.forEach((item) => {
+                    const suggestion = document.createElement('div');
+
+                    suggestion.textContent = item;
+
+                    suggestion.style.cssText =
+                        'padding:10px;cursor:pointer;border-bottom:1px solid #444;color:#fff;';
+
+                    suggestion.addEventListener('click', () => {
+                        const tagInput = document.getElementById(
+                            'tag-input'
+                        );
+
+                        if (tagInput) {
+                            tagInput.value = item;
+                        }
+
+                        dropdown.style.display = 'none';
+
+                        applySearch();
+                    });
+
+                    dropdown.appendChild(suggestion);
+                });
+
+                dropdown.style.display = 'block';
+            });
+        return;
+    }
+
+    // Filter hanya dari history jika filter kosong
     const filteredHistory = getSearchHistory().filter(
-        (item) => {
-            return item
+        (item) =>
+            item
                 .toLowerCase()
-                .includes(normalizedFilter);
-        }
+                .includes('')
     );
 
     if (!filteredHistory.length) {
@@ -2163,6 +2395,78 @@ function showSuggestions(filterText = '') {
 
 
 // ============================================================
+// 26. AUTOCOMPLETE / TAG SUGGESTIONS
+// ============================================================
+
+function fetchBooruAutocomplete(filterText = '') {
+    return new Promise((resolve, reject) => {
+        const sourceSelect = document.getElementById('source-select');
+        const source = sourceSelect ? sourceSelect.value : 'all';
+
+        let apiUrl;
+
+        if (source === 'gelbooru') {
+            apiUrl = 'https://gelbooru.com/index.php?page=dapi&s=index&json=1&limit=50&tags=' +
+                encodeURIComponent(filterText);
+        } else if (source === 'rule34') {
+            apiUrl = 'https://rule34.xxx/index.php?page=dapi&s=index&json=1&limit=50&tags=' +
+                encodeURIComponent(filterText);
+        } else {
+            // danbooru
+            apiUrl = 'https://danbooru.donmai.us/tags.json?search[name]=' +
+                encodeURIComponent(filterText) + '&limit=50';
+        }
+
+        fetch(apiUrl, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json'
+            },
+            cache: 'no-store'
+        })
+            .then((response) => {
+                if (!response.ok) {
+                    throw new Error('API request failed: ' + response.status);
+                }
+                return response.json();
+            })
+            .then((data) => {
+                let tags = [];
+
+                if (source === 'gelbooru' || source === 'rule34') {
+                    // Format: { posts: [...] } atau array langsung
+                    if (Array.isArray(data.posts)) {
+                        tags = data.posts;
+                    } else if (data.post && Array.isArray(data.post)) {
+                        tags = [data.post];
+                    }
+                    // Extract name and post_count
+                    tags = tags.map((t) => ({
+                        name: t.tag || t.name || '',
+                        post_count: t.posts || t.post_count || 0
+                    })).filter((t) => t.name);
+                }
+                else if (source === 'danbooru') {
+                    // Format: array of { name, category, post_count }
+                    if (Array.isArray(data)) {
+                        tags = data.map((t) => ({
+                            name: t.name || '',
+                            category: t.category || '',
+                            post_count: t.post_count || 0
+                        })).filter((t) => t.name);
+                    }
+                }
+
+                resolve(tags);
+            })
+            .catch((error) => {
+                console.error('[NyanPict] Autocomplete fetch error:', error);
+                reject(error);
+            });
+    });
+}
+
+// ============================================================
 // 27. APPLY SEARCH
 // ============================================================
 
@@ -2175,6 +2479,10 @@ function applySearch() {
         'tag-input'
     );
 
+    const aiToggleLabel = document.getElementById(
+        'ai-toggle-label'
+    );
+
     if (!sourceSelect || !tagInput) {
         console.error(
             '[NyanPict] #source-select atau #tag-input tidak ditemukan.'
@@ -2184,6 +2492,23 @@ function applySearch() {
 
     currentSource = sourceSelect.value || 'all';
     currentTags = tagInput.value.trim();
+
+    // AI Filter State
+    let aiFilterOn = getStorageItem('nyanpict_ai_filter') !== 'false';
+    if (aiToggleLabel) {
+        aiToggleLabel.textContent = aiFilterOn ? '🤖 AI: On' : '🤖 AI: Off';
+    }
+
+    // Jika AI Filter Matikan, hapus tag-tag yang mengandung "ai" dari search
+    if (!aiFilterOn) {
+        // Regex kuat: hapus tag yang mengandung ai, ai-generated, ai_art, dst
+        currentTags = currentTags.split(/\s+/).filter(t => !/\bai[_-]?\w*/i.test(t) && !/^ai$/i.test(t)).join(' ');
+
+        // Tambah penalty rating:explicit agar API kurangi gambar "berbau" AI
+        if (!/\brating:/i.test(currentTags)) {
+            currentTags = `${currentTags} rating:safe`.trim();
+        }
+    }
 
     saveSearchHistory(currentTags);
 
@@ -2195,7 +2520,27 @@ function applySearch() {
         dropdown.style.display = 'none';
     }
 
+    currentPage = 1;
+    updatePageControls();
     loadFeed(true);
+}
+
+function updatePageControls() {
+    const firstBtn = document.getElementById('first-page-btn');
+    const prevBtn = document.getElementById('prev-page-btn');
+    const pageInput = document.getElementById('page-input');
+
+    if (pageInput) {
+        pageInput.value = currentPage;
+    }
+    if (prevBtn) {
+        prevBtn.disabled = currentPage <= 1;
+        prevBtn.style.opacity = currentPage <= 1 ? '0.4' : '1';
+    }
+    if (firstBtn) {
+        firstBtn.disabled = currentPage <= 1;
+        firstBtn.style.opacity = currentPage <= 1 ? '0.4' : '1';
+    }
 }
 
 
@@ -2284,6 +2629,8 @@ function openLightbox(
         modalVideo.src = mediaUrl;
         modalVideo.controls = true;
         modalVideo.playsInline = true;
+        modalVideo.muted = true;    // Tambahkan ini
+        modalVideo.autoplay = true; // Tambahkan ini
         modalVideo.style.display = 'block';
     }
 
@@ -2354,6 +2701,34 @@ function openLightbox(
         );
     });
 
+    const openWebButton = document.createElement('button');
+    openWebButton.type = 'button';
+    openWebButton.className = 'overview-openweb-btn';
+    openWebButton.textContent = '🌐 Buka Web';
+    openWebButton.title = 'Buka halaman postingan di browser';
+    openWebButton.disabled = !currentLightboxData;
+
+    openWebButton.addEventListener('click', () => {
+        if (!currentLightboxData) {
+            return;
+        }
+
+        let webUrl;
+        if (currentLightboxData.platform === 'gelbooru') {
+            webUrl = 'https://gelbooru.com/index.php?page=post&s=view&id=' + currentLightboxData.id;
+        } else if (currentLightboxData.platform === 'rule34') {
+            webUrl = 'https://rule34.xxx/index.php?page=post&s=view&id=' + currentLightboxData.id;
+        } else if (currentLightboxData.platform === 'danbooru') {
+            webUrl = 'https://danbooru.donmai.us/posts/' + currentLightboxData.id;
+        } else {
+            webUrl = currentLightboxData.url || '';
+        }
+
+        if (webUrl) {
+            window.open(webUrl, '_blank');
+        }
+    });
+
     const closeButton = document.createElement('button');
 
     closeButton.type = 'button';
@@ -2367,6 +2742,7 @@ function openLightbox(
 
     actions.append(
         downloadButton,
+        openWebButton,
         closeButton
     );
 
@@ -2459,7 +2835,7 @@ function showToast(
         'margin:5px',
         'border-radius:5px',
         'color:#fff',
-        `background:${type === 'error' ? '#e63946' : '#2a9d8f'}`,
+        `background:${type === 'error' ? '#e63946' : type === 'info' ? '#2a9d8f' : '#2a9d8f'}`,
         'box-shadow:0 3px 12px rgba(0,0,0,.25)',
         'font-size:13px',
         'max-width:min(90vw,520px)'
@@ -2467,9 +2843,11 @@ function showToast(
 
     container.appendChild(toast);
 
-    window.setTimeout(() => {
+    const timer = window.setTimeout(() => {
         toast.remove();
     }, 4500);
+
+    return { toast, cancel: () => { toast.remove(); clearTimeout(timer); } };
 }
 
 
@@ -2504,6 +2882,27 @@ function initializeNyanPict() {
         );
     }
 
+    // AI Filter Toggle Initialization
+    const aiToggleLabel = document.getElementById('ai-toggle-label');
+    if (aiToggleLabel) {
+        // Baca state dari localStorage (default: true/AI On)
+        let aiFilterOn = getStorageItem('nyanpict_ai_filter') !== 'false';
+        aiToggleLabel.textContent = aiFilterOn ? '🤖 AI: On' : '🤖 AI: Off';
+
+        aiToggleLabel.addEventListener('click', () => {
+            aiFilterOn = !aiFilterOn;
+            setStorageItem('nyanpict_ai_filter', aiFilterOn ? 'true' : 'false');
+            aiToggleLabel.textContent = aiFilterOn ? '🤖 AI: On' : '🤖 AI: Off';
+        });
+    }
+
+// View Size - read saved value from localStorage
+    let savedViewSize = getStorageItem('nyanpict_view_size');
+    if (!savedViewSize || isNaN(savedViewSize)) {
+        savedViewSize = '50';
+    }
+    currentViewSize = parseInt(savedViewSize, 10);
+
     initializeThumbnailObserver();
 
     if (
@@ -2516,36 +2915,6 @@ function initializeNyanPict() {
     }
 
     // Infinite scroll.
-
-    const sentinel = document.getElementById(
-        'scroll-sentinel'
-    );
-
-    if (
-        sentinel &&
-        'IntersectionObserver' in window
-    ) {
-        const feedObserver = new IntersectionObserver(
-            (entries) => {
-                if (
-                    entries.some(
-                        (entry) => entry.isIntersecting
-                    ) &&
-                    !isLoading &&
-                    !isEndOfResults
-                ) {
-                    loadFeed(false);
-                }
-            },
-            {
-                root: null,
-                rootMargin: '400px 0px',
-                threshold: 0
-            }
-        );
-
-        feedObserver.observe(sentinel);
-    }
 
     // Klik area luar Overview untuk menutup.
 
@@ -2575,7 +2944,73 @@ function initializeNyanPict() {
         }
     );
 
+    // --- Lightweight Classic Pagination ---
+
+    const firstBtn = document.getElementById('first-page-btn');
+    const prevBtn = document.getElementById('prev-page-btn');
+    const nextBtn = document.getElementById('next-page-btn');
+    const pageInput = document.getElementById('page-input');
+    const pageTotalLabel = document.getElementById('page-total-label');
+
+    if (pageTotalLabel) {
+        pageTotalLabel.textContent = 'of ∞';
+    }
+
+    function goToPage(pageNum) {
+        pageNum = Math.max(1, parseInt(pageNum, 10) || 1);
+        if (!isLoading && pageNum === currentPage) {
+            return; // Already on this page
+        }
+
+        if (pageInput) {
+            pageInput.value = pageNum;
+        }
+
+        currentPage = pageNum;
+        isEndOfResults = false;
+        loadFeed(true); // Selalu reset gallery setiap ganti halaman supaya bersih dan tidak loncat
+        updatePageControls();
+    }
+
+    if (prevBtn) {
+        prevBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            goToPage(currentPage - 1);
+        });
+    }
+
+    if (firstBtn) {
+        firstBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            goToPage(1);
+        });
+    }
+
+    if (nextBtn) {
+        nextBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            goToPage(currentPage + 1);
+        });
+    }
+
+    if (pageInput) {
+        pageInput.addEventListener('change', () => {
+            goToPage(pageInput.value);
+        });
+
+        pageInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                goToPage(pageInput.value);
+            }
+        });
+    }
+
+    // (Sentinel dihapus karena menggunakan pagination bar)
+
+    // Auto-load on startup (pastikan dipanggil agar langsung muat tanpa perlu klik search)
     loadFeed(true);
+    updatePageControls();
 }
 
 
