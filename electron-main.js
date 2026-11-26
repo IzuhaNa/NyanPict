@@ -22,6 +22,8 @@ const {
 const path = require('path');
 const fs = require('fs/promises');
 
+const { autoUpdater } = require('electron-updater');
+
 // ============================================================
 // 1. CONFIGURATION
 // ============================================================
@@ -861,8 +863,157 @@ ipcMain.on('window:close', (event) => {
 });
 
 // ============================================================
-// 11. APP LIFECYCLE
+// 12. APP LIFECYCLE
 // ============================================================
+
+// ============================================================
+// AUTO UPDATE (electron-updater)
+// ============================================================
+// Menggunakan GitHub Releases (package.json -> build.publish).
+// Versi dibandingkan secara semver; patch 1.0.0 -> 1.0.1 akan
+// terdeteksi otomatis dan dipasang saat restart.
+let updateDownloaded = false;
+
+function setupAutoUpdater() {
+    if (!app.isPackaged) {
+        console.log(
+            '[NyanPict] Auto-update dinonaktifkan (mode development).'
+        );
+        return;
+    }
+
+    autoUpdater.autoDownload = true;
+    autoUpdater.autoInstallOnAppQuit = true;
+    autoUpdater.allowPrerelease = false;
+
+    // Logging event
+    autoUpdater.on('checking-for-update', () => {
+        console.log('[NyanPict] Memeriksa pembaruan...');
+    });
+
+    autoUpdater.on('update-available', (info) => {
+        console.log(
+            `[NyanPict] Pembaruan tersedia: ${info.version}`
+        );
+        if (mainWindow) {
+            mainWindow.webContents.send(
+                'update:status',
+                {
+                    state: 'available',
+                    version: info.version,
+                    message: `Versi ${info.version} tersedia. Mengunduh...`
+                }
+            );
+        }
+    });
+
+    autoUpdater.on('update-not-available', () => {
+        console.log('[NyanPict] Aplikasi sudah versi terbaru.');
+        if (mainWindow) {
+            mainWindow.webContents.send(
+                'update:status',
+                {
+                    state: 'none',
+                    version: app.getVersion(),
+                    message: 'Aplikasi sudah versi terbaru.'
+                }
+            );
+        }
+    });
+
+    autoUpdater.on('download-progress', (progress) => {
+        const percent = Math.round(progress.percent || 0);
+        console.log(
+            `[NyanPict] Mengunduh pembaruan: ${percent}%`
+        );
+        if (mainWindow) {
+            mainWindow.webContents.send(
+                'update:status',
+                {
+                    state: 'downloading',
+                    version: app.getVersion(),
+                    percent,
+                    message: `Mengunduh pembaruan: ${percent}%`
+                }
+            );
+        }
+    });
+
+    autoUpdater.on('update-downloaded', (info) => {
+        updateDownloaded = true;
+        console.log(
+            `[NyanPict] Pembaruan ${info.version} selesai diunduh.`
+        );
+        if (mainWindow) {
+            mainWindow.webContents.send(
+                'update:status',
+                {
+                    state: 'downloaded',
+                    version: info.version,
+                    message: `Pembaruan ${info.version} siap. Klik untuk menginstal.`
+                }
+            );
+        }
+    });
+
+    autoUpdater.on('error', (error) => {
+        console.error(
+            '[NyanPict] Error auto-update:',
+            error
+        );
+        if (mainWindow) {
+            mainWindow.webContents.send(
+                'update:status',
+                {
+                    state: 'error',
+                    version: app.getVersion(),
+                    message: `Gagal memeriksa pembaruan: ${error.message}`
+                }
+            );
+        }
+    });
+
+    // IPC: cek pembaruan dari renderer
+    ipcMain.handle('update:check', async () => {
+        try {
+            await autoUpdater.checkForUpdates();
+            return { success: true };
+        } catch (error) {
+            console.error(
+                '[NyanPict] Gagal checkForUpdates:',
+                error
+            );
+            return {
+                success: false,
+                error: error.message
+            };
+        }
+    });
+
+    // IPC: instal pembaruan setelah diunduh
+    ipcMain.handle('update:install', async () => {
+        if (!updateDownloaded) {
+            return { success: false, error: 'Belum ada pembaruan terunduh.' };
+        }
+        autoUpdater.quitAndInstall();
+        return { success: true };
+    });
+
+    // IPC: ambil versi aplikasi saat ini
+    ipcMain.handle('app:get-version', async () => {
+        return app.getVersion();
+    });
+
+    // Mulai cek setelah jendela dibuat
+    setTimeout(() => {
+        autoUpdater.checkForUpdates().catch((error) => {
+            console.error(
+                '[NyanPict] Gagal auto check update:',
+                error
+            );
+        });
+    }, 3000);
+}
 
 app.whenReady().then(() => {
     console.log(
@@ -872,6 +1023,8 @@ app.whenReady().then(() => {
     installBooruRequestHeaders();
 
     createWindow();
+
+    setupAutoUpdater();
 
     app.on('activate', () => {
         if (

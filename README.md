@@ -2,12 +2,13 @@
 
 **NyanPict** is a Booru image gallery application designed to make browsing, searching, viewing, and saving anime-style illustrations easier.
 
-**Current Version:** `v1.0.0.1` — See [CHANGELOG.md](./CHANGELOG.md) for full release notes.
+**Current Version:** `v1.0.1` — See [CHANGELOG.md](./CHANGELOG.md) for full release notes.
 
 The project supports desktop and Android environments, with a simple interface focused on image discovery and organization.
 
 ## Features
 
+- **Auto-Update** — Automatically checks for and installs new versions from GitHub Releases (in-app `Cek Update` button).
 - **Image Gallery** — Browse illustrations from supported Booru sources in deterministic order.
 - **Classic Pagination** — Navigate pages cleanly with First, Prev, Next, and direct page jump controls.
 - **Tag Search & Autocomplete** — Search images using tags with live Booru tag suggestions and search history.
@@ -21,8 +22,9 @@ The project supports desktop and Android environments, with a simple interface f
 - **Desktop Support** — Built with Electron.
 - **Android Support** — Built with Capacitor.
 
-## What's New in v1.0.0.1
+## What's New in v1.0.1
 
+- Added automatic patch updates via GitHub Releases (`electron-updater`) with an in-app `Cek Update` / `Instal Update` button.
 - Added bottom pagination bar (`First`, `Prev`, `Page` input, `Next`) and fixed page skipping / repeated image bugs.
 - Added `AI: On/Off` search filter toggle, `View Size` selector, `Image Quality` setting, and `DNS Override` in Settings.
 - Added auto-load on startup, thumbnail preloading, live tag autocomplete, and `Open in Browser` in the lightbox.

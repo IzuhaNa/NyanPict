@@ -85,6 +85,32 @@ contextBridge.exposeInMainWorld(
         hasApiKey: (source) => {
             if (typeof source !== 'string') return false;
             return ipcRenderer.invoke('api-key:has', source);
+        },
+
+        // ============================================================
+        // AUTO UPDATE (electron-updater)
+        // ============================================================
+        checkForUpdates: () => {
+            return ipcRenderer.invoke('update:check');
+        },
+
+        installUpdate: () => {
+            return ipcRenderer.invoke('update:install');
+        },
+
+        getAppVersion: () => {
+            return ipcRenderer.invoke('app:get-version');
+        },
+
+        onUpdateStatus: (callback) => {
+            if (typeof callback !== 'function') return () => {};
+            const listener = (_event, payload) => {
+                callback(payload);
+            };
+            ipcRenderer.on('update:status', listener);
+            return () => {
+                ipcRenderer.removeListener('update:status', listener);
+            };
         }
     })
 );

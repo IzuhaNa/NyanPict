@@ -3011,6 +3011,96 @@ function initializeNyanPict() {
     // Auto-load on startup (pastikan dipanggil agar langsung muat tanpa perlu klik search)
     loadFeed(true);
     updatePageControls();
+
+    initVersionUI();
+}
+
+// ============================================================
+// 31.5 VERSION & AUTO UPDATE UI
+// ============================================================
+
+function initVersionUI() {
+    const versionLabel = document.getElementById('app-version-label');
+    const checkBtn = document.getElementById('check-update-btn');
+    const installBtn = document.getElementById('install-update-btn');
+    const statusLabel = document.getElementById('update-status-label');
+
+    const setStatus = (msg) => {
+        if (statusLabel) {
+            statusLabel.textContent = msg || '';
+        }
+    };
+
+    // Muat versi dari main process (packaged build membaca package.json version)
+    if (window.electronAPI && typeof window.electronAPI.getAppVersion === 'function') {
+        window.electronAPI
+            .getAppVersion()
+            .then((v) => {
+                if (versionLabel) {
+                    versionLabel.textContent = `v${v}`;
+                }
+            })
+            .catch(() => {
+                // Abaikan: versi renderer default tetap tampil
+            });
+    }
+
+    // Dengarkan status update dari main process
+    if (window.electronAPI && typeof window.electronAPI.onUpdateStatus === 'function') {
+        window.electronAPI.onUpdateStatus((payload) => {
+            if (!payload) {
+                return;
+            }
+            setStatus(payload.message || '');
+            if (payload.state === 'downloaded' && installBtn) {
+                installBtn.style.display = 'inline-block';
+            }
+            if (payload.state === 'none' || payload.state === 'error') {
+                if (installBtn) {
+                    installBtn.style.display = 'none';
+                }
+            }
+        });
+    }
+
+    if (checkBtn) {
+        checkBtn.addEventListener('click', () => {
+            setStatus('Memeriksa pembaruan...');
+            if (window.electronAPI && typeof window.electronAPI.checkForUpdates === 'function') {
+                window.electronAPI.checkForUpdates()
+                    .then((result) => {
+                        if (!result || !result.success) {
+                            setStatus(
+                                (result && result.error) || 'Gagal memeriksa pembaruan.'
+                            );
+                        }
+                    })
+                    .catch((error) => {
+                        setStatus(`Gagal memeriksa pembaruan: ${error.message}`);
+                    });
+            } else {
+                setStatus('Auto-update tidak tersedia (mode development).');
+            }
+        });
+    }
+
+    if (installBtn) {
+        installBtn.addEventListener('click', () => {
+            if (window.electronAPI && typeof window.electronAPI.installUpdate === 'function') {
+                window.electronAPI.installUpdate()
+                    .then((result) => {
+                        if (!result || !result.success) {
+                            setStatus(
+                                (result && result.error) || 'Gagal menginstal pembaruan.'
+                            );
+                        }
+                    })
+                    .catch((error) => {
+                        setStatus(`Gagal menginstal: ${error.message}`);
+                    });
+            }
+        });
+    }
 }
 
 

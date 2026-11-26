@@ -101,6 +101,80 @@
             (Frontend-Only)
         </p>
 
+        <!-- VERSION + UPDATE BADGE -->
+        <div
+            id="version-badge"
+            style="
+                display:flex;
+                justify-content:center;
+                align-items:center;
+                gap:8px;
+                margin-bottom:15px;
+                flex-wrap:wrap;
+            "
+        >
+            <span
+                id="app-version-label"
+                style="
+                    padding:4px 10px;
+                    background:#1e1e1e;
+                    color:#2a9d8f;
+                    border:1px solid #2a9d8f;
+                    border-radius:20px;
+                    font-size:11px;
+                    font-weight:bold;
+                "
+            >
+                v1.0.0
+            </span>
+
+            <button
+                id="check-update-btn"
+                type="button"
+                style="
+                    padding:4px 12px;
+                    background:#333;
+                    color:#fff;
+                    border:none;
+                    border-radius:20px;
+                    font-size:11px;
+                    font-weight:bold;
+                    cursor:pointer;
+                "
+                title="Periksa pembaruan"
+            >
+                🔄 Cek Update
+            </button>
+
+            <button
+                id="install-update-btn"
+                type="button"
+                style="
+                    display:none;
+                    padding:4px 12px;
+                    background:#2a9d8f;
+                    color:#fff;
+                    border:none;
+                    border-radius:20px;
+                    font-size:11px;
+                    font-weight:bold;
+                    cursor:pointer;
+                "
+                title="Instal pembaruan"
+            >
+                ⬇ Instal Update
+            </button>
+        </div>
+
+        <div
+            id="update-status-label"
+            style="
+                text-align:center;
+                font-size:11px;
+                color:#aaa;
+                margin-bottom:10px;
+            "
+        ></div>
 
         <!-- NAVIGATION -->
 
